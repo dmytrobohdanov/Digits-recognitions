@@ -23,6 +23,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import static org.opencv.imgproc.Imgproc.MORPH_ELLIPSE;
+import static org.opencv.imgproc.Imgproc.MORPH_OPEN;
+import static org.opencv.imgproc.Imgproc.THRESH_BINARY_INV;
+import static org.opencv.imgproc.Imgproc.THRESH_OTSU;
+
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "mainActTaag";
 
@@ -92,6 +97,16 @@ public class MainActivity extends AppCompatActivity {
                 outputMat,
                 perspectiveTransform,
                 new Size(sourceArray[2].x, sourceArray[1].y * 0.8));
+
+        Imgproc.cvtColor(outputMat, outputMat, Imgproc.COLOR_BGRA2GRAY);
+
+        Imgproc.threshold(outputMat, outputMat,
+                0,
+                255,
+                THRESH_BINARY_INV | THRESH_OTSU);
+
+        Mat kernel = Imgproc.getStructuringElement(MORPH_ELLIPSE, new Size(1, 5));
+        Imgproc.morphologyEx(outputMat, outputMat, MORPH_OPEN, kernel);
 
         //creating output bitmap
         Bitmap outputBitmap = Bitmap.createBitmap(outputMat.cols(), outputMat.rows(), Bitmap.Config.ARGB_8888);

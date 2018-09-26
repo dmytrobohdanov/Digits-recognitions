@@ -4,17 +4,16 @@ import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
-import org.opencv.core.Scalar;
+import org.opencv.core.Point;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
@@ -38,56 +37,74 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "OpenCV initialize failed");
         }
 
-
-        //#1
+        //getting bitmap
         Bitmap img = getBitmapFromAsset(this);
 
+        //pre processing image, preparing to recognition
         Mat mat = preprocessImg(img);
 
 
+        //detecting contours
         ArrayList<MatOfPoint> contours =
                 ImgprocUtils.findContours(mat, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
+        //creating holder of all 4-vertices shapes
+        ArrayList<MatOfPoint> fourVerticesShapes = new ArrayList<>();
 
-        contours = contoursSort(contours);
-
-        ArrayList<MatOfPoint> newContures = new ArrayList<>();
         for (MatOfPoint contour : contours) {
             double lenght = Imgproc.arcLength(new MatOfPoint2f(contour.toArray()), true);
             MatOfPoint2f shape = ImgprocUtils.approxPolyDP(new MatOfPoint2f(contour.toArray()), 0.02 * lenght, true);
 
-//            if (shape.total() == 4) {
-            newContures.add(new MatOfPoint(shape.toArray()));
-//            }
-//            }
+            if (shape.total() == 4) {
+                fourVerticesShapes.add(new MatOfPoint(shape.toArray()));
+            }
         }
 
-        Imgproc.drawContours(mat, newContures, -1, new Scalar(255, 125, 125, 255), 5);
 
-        img = ImgprocUtils.matToBitmap(mat, img);
+        //transformation
+        //sorting of contours
+        fourVerticesShapes = contoursSort(fourVerticesShapes);
+
+        //getting last element, the biggest area shape, we presume that it is our display
+        MatOfPoint2f foundedShape = new MatOfPoint2f(fourVerticesShapes.get(fourVerticesShapes.size() - 1).toArray());
+
+        //getting array of points created shape, we presume there are 4 points
+        Point[] sourceArray = foundedShape.toArray();
+
+        //creating new array of points for transformation destination
+        Point[] resultedArray = new Point[]{
+                new Point(0, 0),
+                new Point(0, sourceArray[1].y * 0.8),
+                new Point(sourceArray[2].x, sourceArray[1].y * 0.8),
+                new Point(sourceArray[2].x, 0)};
+
+        //creating destination matrix
+        MatOfPoint2f resultedMat = new MatOfPoint2f(resultedArray);
+
+        //getting PerspectiveTransform matrix
+        Mat perspectiveTransform = Imgproc.getPerspectiveTransform(foundedShape, resultedMat);
+
+        //creating output matrix
+        Mat outputMat = new Mat();
+
+        //transformation
+        Imgproc.warpPerspective(ImgprocUtils.getMatFromBitmap(img),
+                outputMat,
+                perspectiveTransform,
+                new Size(sourceArray[2].x, sourceArray[1].y * 0.8));
+
+        //creating output bitmap
+        Bitmap outputBitmap = Bitmap.createBitmap(outputMat.cols(), outputMat.rows(), Bitmap.Config.ARGB_8888);
+
+        outputBitmap = ImgprocUtils.matToBitmap(outputMat, outputBitmap);
 
         ImageView imgView = findViewById(R.id.imageView);
-        imgView.setImageBitmap(img);
-
+        imgView.setImageBitmap(outputBitmap);
     }
 
-
-    private ArrayList<MatOfPoint> contoursSort(ArrayList<MatOfPoint> contours) {
-        MatOfPoint[] contoursArray = new MatOfPoint[contours.size()];
-        contoursArray = (MatOfPoint[]) contours.toArray();
-
-        Arrays.sort(contoursArray, new Comparator<MatOfPoint>() {
-            @Override
-            public int compare(MatOfPoint o1, MatOfPoint o2) {
-                return Double.compare(Imgproc.contourArea(o1), Imgproc.contourArea(o2));
-            }
-        });
-
-        return new ArrayList<>(Arrays.asList(contoursArray));
-    }
 
     private Mat preprocessImg(Bitmap img) {
-        img = ImgprocUtils.resize(img);
+//        img = ImgprocUtils.resize(img);
         Mat mat = ImgprocUtils.getMatFromBitmap(img);
         mat = preprocessImg(mat);
 
@@ -99,10 +116,29 @@ public class MainActivity extends AppCompatActivity {
         mat = ImgprocUtils.gaussianBlur(mat, new Size(5, 5), 0);
         mat = ImgprocUtils.equalizeHist(mat);
 
-        mat = ImgprocUtils.canny(mat, 20, 80);
-//        mat = ImgprocUtils.canny(mat, 50, 200);
+//        mat = ImgprocUtils.canny(mat, 20, 80);
+        mat = ImgprocUtils.canny(mat, 50, 200);
 
         return mat;
+    }
+
+    /**
+     * sorting contours
+     *
+     * @param contours array of contours to sort
+     * @return sorted array of contours
+     */
+    private ArrayList<MatOfPoint> contoursSort(ArrayList<MatOfPoint> contours) {
+        MatOfPoint[] contoursArray = contours.toArray(new MatOfPoint[contours.size()]);
+
+        Arrays.sort(contoursArray, new Comparator<MatOfPoint>() {
+            @Override
+            public int compare(MatOfPoint o1, MatOfPoint o2) {
+                return Double.compare(Imgproc.contourArea(o1), Imgproc.contourArea(o2));
+            }
+        });
+
+        return new ArrayList<>(Arrays.asList(contoursArray));
     }
 
 

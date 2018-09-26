@@ -6,10 +6,12 @@ import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  *
@@ -61,5 +63,9 @@ public class ImgprocUtils {
     public static Mat equalizeHist(Mat source) {
         Imgproc.equalizeHist(source, source);
         return source;
+    }
+
+    public static void drawContours(Mat mat, List<MatOfPoint> newContures) {
+        Imgproc.drawContours(mat, newContures, -1, new Scalar(255, 125, 125, 255), 5);
     }
 }

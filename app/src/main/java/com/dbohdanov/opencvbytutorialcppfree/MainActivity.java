@@ -34,6 +34,7 @@ import static org.opencv.imgproc.Imgproc.THRESH_OTSU;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "mainActTaag";
+    public static final String TAG1 = "flowRecogn";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,6 +139,7 @@ public class MainActivity extends AppCompatActivity {
 
             int number = whatNumberIsThis(submat);
 
+            Log.d(TAG1, "the number is: " + number);
         }
         //---------------
 
@@ -167,9 +169,19 @@ public class MainActivity extends AppCompatActivity {
         int ctrlRowUpperNum = mat.rows() / 4;
         int ctrlRowDownNum = ctrlRowUpperNum * 3;
 
-        int[] ctrlColArray = getPixelsPatternFromCol(mat, ctrlColumnNum);
+        int[] ctrlColArray = getPixelsArrayFromCol(mat, ctrlColumnNum);
         int[] ctrlRowUpArray = getPixelsArrayByRow(mat, ctrlRowUpperNum);
         int[] ctrlRowDownArray = getPixelsArrayByRow(mat, ctrlRowDownNum);
+
+        try {
+            int assumedNumber = getNumberPatternByArrays(ctrlColArray, ctrlColumnNum,
+                    ctrlRowUpArray, ctrlRowUpperNum,
+                    ctrlRowDownArray, ctrlRowDownNum);
+
+            return getNumberByPattern(assumedNumber);
+        } catch (NotNumberException e) {
+            return -1;
+        }
 
         //plan
         // взять 3 линии пикселей, с обрезанными gap краями
@@ -180,45 +192,254 @@ public class MainActivity extends AppCompatActivity {
         // сравнить с имеющеющимеся паттернами цифр
         // сделать строку
 
-        int v = getSegmentsNumberFromArray(ctrlRowUpArray);
-
-        return 0;
+//        int v = getSegmentsNumberFromArray(ctrlRowUpArray);
     }
 
-    private int getSegmentsNumberFromArray(int[] array) {
-        boolean flag;
-        for (int i = 0; i < array.length; i++) {
+    /**
+     * checking is assumed digit's patter is really digit
+     *
+     * @param assumedNumber pattern of assumed number to check is this digit
+     * @return recognized number of negative int if it is not number
+     */
+    private int getNumberByPattern(int assumedNumber) {
+
+        switch (assumedNumber) {
+            case 63:
+                return 0;
+
+            case 6:
+                return 1;
+
+            case 91:
+                return 2;
+
+            case 79:
+                return 3;
+
+            case 102:
+                return 4;
+
+            case 109:
+                return 5;
+
+            case 125:
+                return 6;
+
+            case 7:
+                return 7;
+
+            case 127:
+                return 8;
+
+            case 111:
+                return 9;
+
+            default:
+                return -1;
         }
-        return 0;
     }
 
-    private int getPixelsPatternFromCol(Mat mat, int ctrlColumnNum) {
+    /**
+     * todo
+     *
+     * @param ctrlColArray
+     * @param ctrlColumnNum
+     * @param ctrlRowUpArray
+     * @param ctrlRowUpperNum
+     * @param ctrlRowDownArray
+     * @param ctrlRowDownNum
+     * @return
+     * @throws NotNumberException
+     */
+    private int getNumberPatternByArrays(int[] ctrlColArray, int ctrlColumnNum,
+                                         int[] ctrlRowUpArray, int ctrlRowUpperNum,
+                                         int[] ctrlRowDownArray, int ctrlRowDownNum) throws NotNumberException {
+        //number of pixels to cut from borders
+        int borderPix = 7;
 
-        //gap number to cut border's pixel which are unpredictable
-        int gap = 5;
+        //resulted pattern value
+        //int value where each bit represents segment of 7-segment number
+        int resultedPattern = 0;
 
-        //init flag value as first in array
-        double lastVal = mat.get(gap, ctrlColumnNum)[0];
+        //segment 0
+        int[] seg0Array = Arrays.copyOfRange(ctrlColArray, borderPix, ctrlRowUpperNum);
+        resultedPattern = isSegmentOn(seg0Array, 0) ? resultedPattern | 0b1 : resultedPattern;
 
-        for (int i = gap; i < mat.rows() - gap; i++) {
-            double current = mat.get(i, ctrlColumnNum)[0];
-            if (current != lastVal) {
+        //segment 1
+        int[] seg1Array = Arrays.copyOfRange(ctrlRowUpArray, ctrlColumnNum, ctrlRowUpArray.length - borderPix);
+        resultedPattern = isSegmentOn(seg1Array, 1) ? resultedPattern | 0b10 : resultedPattern;
 
-                lastVal = current;
+        //segment 2
+        int[] seg2Array = Arrays.copyOfRange(ctrlRowDownArray, ctrlColumnNum, ctrlRowDownArray.length - borderPix);
+        resultedPattern = isSegmentOn(seg2Array, 2) ? resultedPattern | 0b100 : resultedPattern;
+
+        //segment 3
+        int[] seg3Array = Arrays.copyOfRange(ctrlColArray, ctrlRowDownNum, ctrlColArray.length - borderPix);
+        resultedPattern = isSegmentOn(seg3Array, 3) ? resultedPattern | 0b1000 : resultedPattern;
+
+        //segment 4
+        int[] seg4Array = Arrays.copyOfRange(ctrlRowDownArray, borderPix, ctrlColumnNum);
+        resultedPattern = isSegmentOn(seg4Array, 4) ? resultedPattern | 0b10000 : resultedPattern;
+
+        //segment 5
+        int[] seg5Array = Arrays.copyOfRange(ctrlRowUpArray, borderPix, ctrlColumnNum);
+        resultedPattern = isSegmentOn(seg5Array, 5) ? resultedPattern | 0b100000 : resultedPattern;
+
+        //segment 6
+        int[] seg6Array = Arrays.copyOfRange(ctrlColArray, ctrlRowUpperNum + 1, ctrlRowDownNum);
+        resultedPattern = isSegmentOn(seg6Array, 6) ? resultedPattern | 0b1000000 : resultedPattern;
+
+        return resultedPattern;
+    }
+
+
+    /**
+     * check is the segment is ON
+     *
+     * @param segArray     pixels of segment
+     * @param segmentIndex index of segment, counting from the top one clockwise starting from 0 index.
+     *                     the central segment has index 6
+     * @return is this segment is ON
+     * @throws IllegalArgumentException in case of some wrong segment's index
+     * @throws NotNumberException       this segment seems like not segment of digit
+     */
+    private boolean isSegmentOn(int[] segArray, int segmentIndex) throws IllegalArgumentException, NotNumberException {
+        final String NOT_DIGIT_MESSAGE = "this segment seems like not segment of digit";
+
+
+        //init is start pixel is ON
+        boolean startPixIsOn = segArray[0] >= 128;
+
+
+        if (segmentIndex == 0 || segmentIndex == 4 || segmentIndex == 5) {
+
+            //if the segment is ON expect start with TRUE and one color change
+            //if the segment is OFF expect start with FALSE and zero color changes
+            int changes = getNumberOfColorChanges(segArray, 1);
+
+            if (startPixIsOn && changes == 1) {
+
+                return true;
+            } else if (!startPixIsOn && changes == 0) {
+
+                return false;
+            } else {
+
+                throw new NotNumberException(NOT_DIGIT_MESSAGE);
+            }
+        } else if (segmentIndex == 1 || segmentIndex == 2 || segmentIndex == 3) {
+            //if the segment is ON expect start with FALSE and one color change
+            //if the segment if OFF expect start with FALSE and zero color changes
+            //in this case segment can't start from turn-on pixel
+
+            if (startPixIsOn) {
+
+                throw new NotNumberException(NOT_DIGIT_MESSAGE);
+            } else {
+                int changes = getNumberOfColorChanges(segArray, 1);
+
+                if (changes == 1) {
+
+                    return true;
+                } else if (changes == 0) {
+
+                    return false;
+                } else {
+
+                    throw new NotNumberException(NOT_DIGIT_MESSAGE);
+                }
+            }
+        } else if (segmentIndex == 6) {
+            //if the segment is ON expect start with FALSE and two color changes
+            //if the segment if OFF expect start with FALSE and zero color changes
+            //in this case segment can't start from turn-on pixel
+
+            if (startPixIsOn) {
+
+                throw new NotNumberException(NOT_DIGIT_MESSAGE);
+            } else {
+                int changes = getNumberOfColorChanges(segArray, 2);
+
+                if (changes == 2) {
+
+                    return true;
+                } else if (changes == 0) {
+
+                    return false;
+                } else {
+
+                    throw new NotNumberException(NOT_DIGIT_MESSAGE);
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("there are only 7 segments in digit, so index of segment must be 0..6");
+        }
+    }
+
+    /**
+     * counting how many times color changes in specified array
+     *
+     * @param segArray           array to count color's changes
+     * @param maxNumberOfChanges maximum number of color changes to expect this segment
+     *                           to be a part of digit
+     * @return number of changes or negative integer in case it has more colors changes then maximum
+     */
+    private int getNumberOfColorChanges(int[] segArray, int maxNumberOfChanges) {
+        //remember start element
+        int previousPixel = segArray[0];
+
+        //init counter
+        int changeCounter = 0;
+
+        for (int pixelColor : segArray) {
+            //check if color changed
+            if (pixelColor != previousPixel) {
+                changeCounter++;
+
+                //if there was more changes then max number this is not segment of the number
+                // so return negative number and end execution of this method
+                if (changeCounter > maxNumberOfChanges) {
+                    return -1;
+                }
+
+                //remember new color
+                previousPixel = pixelColor;
             }
         }
 
-        return 0;
+        return changeCounter;
     }
 
+
+    /**
+     * getting pixels array from specified column
+     *
+     * @param mat           matrix to get pixels
+     * @param ctrlColumnNum column number
+     * @return array of pixel in the column
+     */
+    private int[] getPixelsArrayFromCol(Mat mat, int ctrlColumnNum) {
+        int[] array = new int[mat.rows()];
+
+        for (int i = 0; i < mat.rows(); i++) {
+            array[i] = (int) mat.get(i, ctrlColumnNum)[0];
+        }
+
+        return array;
+    }
+
+    /**
+     * getting pixels array from specified row
+     *
+     * @param mat        matrix to get pixels
+     * @param ctrlRowNum row number
+     * @return array of pixel in the row
+     */
     private int[] getPixelsArrayByRow(Mat mat, int ctrlRowNum) {
-        //gap number to cut border's pixel which are unpredictable
-        int gap = 5;
+        int[] array = new int[mat.cols()];
 
-        int[] array = new int[mat.cols() - gap * 2];
-
-        for (int i = gap; i < (mat.cols() - gap); i++) {
-            array[i - gap] = (int) mat.get(ctrlRowNum, i)[0];
+        for (int i = 0; i < mat.cols(); i++) {
+            array[i] = (int) mat.get(ctrlRowNum, i)[0];
         }
 
         return array;

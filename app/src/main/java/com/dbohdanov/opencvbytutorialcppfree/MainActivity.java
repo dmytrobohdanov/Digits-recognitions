@@ -34,7 +34,6 @@ import static org.opencv.imgproc.Imgproc.THRESH_OTSU;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "mainActTaag";
-    public static final String TAG1 = "flowRecogn";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,7 +138,6 @@ public class MainActivity extends AppCompatActivity {
 
             int number = whatNumberIsThis(submat);
 
-            Log.d(TAG1, "the number is: " + number);
         }
         //---------------
 
@@ -182,17 +180,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (NotNumberException e) {
             return -1;
         }
-
-        //plan
-        // взять 3 линии пикселей, с обрезанными gap краями
-        // перевести пиксели в тру-фолс, с учетом:
-        // - считать true/false только в заданных 3 прямыми сегментах
-        // перевести тру-фолс в инт-паттерн
-        // или сразу 3 паттерна в общий паттерн
-        // сравнить с имеющеющимеся паттернами цифр
-        // сделать строку
-
-//        int v = getSegmentsNumberFromArray(ctrlRowUpArray);
     }
 
     /**
@@ -255,7 +242,10 @@ public class MainActivity extends AppCompatActivity {
                                          int[] ctrlRowUpArray, int ctrlRowUpperNum,
                                          int[] ctrlRowDownArray, int ctrlRowDownNum) throws NotNumberException {
         //number of pixels to cut from borders
-        int borderPix = 7;
+        int borderPix = 2;
+
+        //getting segment max width, presume that it could not be more then 30% of digit width
+        final int segmentMaxWidth = (int) (0.3 * ctrlRowUpArray.length);
 
         //resulted pattern value
         //int value where each bit represents segment of 7-segment number
@@ -263,31 +253,31 @@ public class MainActivity extends AppCompatActivity {
 
         //segment 0
         int[] seg0Array = Arrays.copyOfRange(ctrlColArray, borderPix, ctrlRowUpperNum);
-        resultedPattern = isSegmentOn(seg0Array, 0) ? resultedPattern | 0b1 : resultedPattern;
+        resultedPattern = isSegmentOn(seg0Array, 0, segmentMaxWidth) ? resultedPattern | 0b1 : resultedPattern;
 
         //segment 1
         int[] seg1Array = Arrays.copyOfRange(ctrlRowUpArray, ctrlColumnNum, ctrlRowUpArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg1Array, 1) ? resultedPattern | 0b10 : resultedPattern;
+        resultedPattern = isSegmentOn(seg1Array, 1, segmentMaxWidth) ? resultedPattern | 0b10 : resultedPattern;
 
         //segment 2
         int[] seg2Array = Arrays.copyOfRange(ctrlRowDownArray, ctrlColumnNum, ctrlRowDownArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg2Array, 2) ? resultedPattern | 0b100 : resultedPattern;
+        resultedPattern = isSegmentOn(seg2Array, 2, segmentMaxWidth) ? resultedPattern | 0b100 : resultedPattern;
 
         //segment 3
         int[] seg3Array = Arrays.copyOfRange(ctrlColArray, ctrlRowDownNum, ctrlColArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg3Array, 3) ? resultedPattern | 0b1000 : resultedPattern;
+        resultedPattern = isSegmentOn(seg3Array, 3, segmentMaxWidth) ? resultedPattern | 0b1000 : resultedPattern;
 
         //segment 4
         int[] seg4Array = Arrays.copyOfRange(ctrlRowDownArray, borderPix, ctrlColumnNum);
-        resultedPattern = isSegmentOn(seg4Array, 4) ? resultedPattern | 0b10000 : resultedPattern;
+        resultedPattern = isSegmentOn(seg4Array, 4, segmentMaxWidth) ? resultedPattern | 0b10000 : resultedPattern;
 
         //segment 5
         int[] seg5Array = Arrays.copyOfRange(ctrlRowUpArray, borderPix, ctrlColumnNum);
-        resultedPattern = isSegmentOn(seg5Array, 5) ? resultedPattern | 0b100000 : resultedPattern;
+        resultedPattern = isSegmentOn(seg5Array, 5, segmentMaxWidth) ? resultedPattern | 0b100000 : resultedPattern;
 
         //segment 6
         int[] seg6Array = Arrays.copyOfRange(ctrlColArray, ctrlRowUpperNum + 1, ctrlRowDownNum);
-        resultedPattern = isSegmentOn(seg6Array, 6) ? resultedPattern | 0b1000000 : resultedPattern;
+        resultedPattern = isSegmentOn(seg6Array, 6, segmentMaxWidth) ? resultedPattern | 0b1000000 : resultedPattern;
 
         return resultedPattern;
     }
@@ -303,49 +293,41 @@ public class MainActivity extends AppCompatActivity {
      * @throws IllegalArgumentException in case of some wrong segment's index
      * @throws NotNumberException       this segment seems like not segment of digit
      */
-    private boolean isSegmentOn(int[] segArray, int segmentIndex) throws IllegalArgumentException, NotNumberException {
+    private boolean isSegmentOn(int[] segArray, int segmentIndex, final int segmentMaxWidth)
+            throws IllegalArgumentException, NotNumberException {
         final String NOT_DIGIT_MESSAGE = "this segment seems like not segment of digit";
-
 
         //init is start pixel is ON
         boolean startPixIsOn = segArray[0] >= 128;
 
-
         if (segmentIndex == 0 || segmentIndex == 4 || segmentIndex == 5) {
+            //cutting starting zero's to prevent appearance of some random spaces
+            segArray = cutZeroPixelsFromBegining(segArray);
 
-            //if the segment is ON expect start with TRUE and one color change
-            //if the segment is OFF expect start with FALSE and zero color changes
-            int changes = getNumberOfColorChanges(segArray, 1);
-
-            if (startPixIsOn && changes == 1) {
-
-                return true;
-            } else if (!startPixIsOn && changes == 0) {
-
+            //if the segment is ON expect start with TRUE, one color change
+            //  and width of segment is no more then segmentMaxWidth
+            //if the segment is OFF expect empty array
+            if (segArray.length == 0) {
                 return false;
+            } else if (getNumberOfColorChangesWithCheck(segArray, 1, segmentMaxWidth) == 1) {
+                return true;
             } else {
-
                 throw new NotNumberException(NOT_DIGIT_MESSAGE);
             }
         } else if (segmentIndex == 1 || segmentIndex == 2 || segmentIndex == 3) {
             //if the segment is ON expect start with FALSE and one color change
-            //if the segment if OFF expect start with FALSE and zero color changes
+            //if the segment if OFF expect empty array
             //in this case segment can't start from turn-on pixel
-
             if (startPixIsOn) {
-
                 throw new NotNumberException(NOT_DIGIT_MESSAGE);
             } else {
-                int changes = getNumberOfColorChanges(segArray, 1);
+                segArray = cutZeroPixelsFromEnd(segArray);
 
-                if (changes == 1) {
-
-                    return true;
-                } else if (changes == 0) {
-
+                if (segArray.length == 0) {
                     return false;
+                } else if (getNumberOfColorChangesWithCheck(segArray, 1, segmentMaxWidth) == 1) {
+                    return true;
                 } else {
-
                     throw new NotNumberException(NOT_DIGIT_MESSAGE);
                 }
             }
@@ -358,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
 
                 throw new NotNumberException(NOT_DIGIT_MESSAGE);
             } else {
-                int changes = getNumberOfColorChanges(segArray, 2);
+                int changes = getNumberOfColorChangesWithCheck(segArray, 2, segmentMaxWidth);
 
                 if (changes == 2) {
 
@@ -376,25 +358,68 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private int[] cutZeroPixels(int[] segArray, boolean isFromBegining) {
+        int startPixel = isFromBegining ? segArray[0] : segArray[segArray.length - 1];
+
+        //if start pixel is not zero return
+        if (startPixel >= 128) {
+            return segArray;
+        }
+
+        int counter = 0;
+        int i = isFromBegining ? 0 : segArray.length - 1;
+
+        while (i >= 0 && i < segArray.length && segArray[i] <= 128) {
+            counter++;
+            i = isFromBegining ? ++i : --i;
+        }
+
+
+        return isFromBegining
+                ? Arrays.copyOfRange(segArray, counter, segArray.length)
+                : Arrays.copyOfRange(segArray, 0, segArray.length - counter);
+    }
+
+    private int[] cutZeroPixelsFromEnd(int[] segArray) {
+        return cutZeroPixels(segArray, false);
+    }
+
+    private int[] cutZeroPixelsFromBegining(int[] segArray) {
+        return cutZeroPixels(segArray, true);
+    }
+
     /**
      * counting how many times color changes in specified array
      *
      * @param segArray           array to count color's changes
      * @param maxNumberOfChanges maximum number of color changes to expect this segment
      *                           to be a part of digit
+     * @param maxLength          max width of segment
      * @return number of changes or negative integer in case it has more colors changes then maximum
+     * or in case of width of segment is more then maxLength
      */
-    private int getNumberOfColorChanges(int[] segArray, int maxNumberOfChanges) {
+    private int getNumberOfColorChangesWithCheck(int[] segArray, int maxNumberOfChanges, int maxLength) {
         //remember start element
         int previousPixel = segArray[0];
 
         //init counter
         int changeCounter = 0;
 
+        //init segment length counter
+        int segmentLengthCounter = 0;
+
         for (int pixelColor : segArray) {
+            if (pixelColor >= 128) {
+                segmentLengthCounter++;
+                if (segmentLengthCounter >= maxLength) {
+                    return -1;
+                }
+            }
+
             //check if color changed
             if (pixelColor != previousPixel) {
                 changeCounter++;
+                segmentLengthCounter = 1;
 
                 //if there was more changes then max number this is not segment of the number
                 // so return negative number and end execution of this method

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import static com.dbohdanov.opencvbytutorialcppfree.utils.Constants.NOT_DIGIT_MESSAGE;
 import static org.opencv.imgproc.Imgproc.CHAIN_APPROX_SIMPLE;
 import static org.opencv.imgproc.Imgproc.MORPH_ELLIPSE;
 import static org.opencv.imgproc.Imgproc.MORPH_OPEN;
@@ -34,6 +35,108 @@ import static org.opencv.imgproc.Imgproc.THRESH_OTSU;
 
 public class MainActivity extends AppCompatActivity {
     public static final String TAG = "mainActTaag";
+
+    public static Bitmap getBitmapFromAsset(Context context) {
+        return getBitmapFromAsset(context, "example.jpg");
+//        return getBitmapFromAsset(context, "example2.png");
+//        return getBitmapFromAsset(context, "dev1.jpg");
+//        return getBitmapFromAsset(context, "dev1_cut.png");
+//        return getBitmapFromAsset(context, "dev2.jpg");
+//        return getBitmapFromAsset(context, "dev3.jpg");
+//        return getBitmapFromAsset(context, "dev4.jpg");
+//        return getBitmapFromAsset(context, "dev4_cut.png");
+    }
+
+    public static Bitmap getBitmapFromAsset(Context context, String filePath) {
+        AssetManager assetManager = context.getAssets();
+
+        InputStream istr;
+        Bitmap bitmap = null;
+        try {
+            istr = assetManager.open(filePath);
+            bitmap = BitmapFactory.decodeStream(istr);
+        } catch (IOException e) {
+            Log.d(TAG, "bitmap error: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return bitmap;
+    }
+
+    /**
+     * detecting what is number is in the matrix
+     * expect 7 segment digit in this matrix
+     *
+     * @param mat matrix to detect the number
+     * @return possible number [0 - 9] or negative value if it is not number in matrix
+     */
+    private int whatNumberIsThis(Mat mat) {
+        //creating 3 control lines:
+        // one is in the middle column to detect horizontal segments of number
+        // second is row to detect upper vertical segments
+        // third one is row to detect down vertical segments
+        int ctrlColumnNum = mat.cols() / 2;
+        int ctrlRowUpperNum = mat.rows() / 4;
+        int ctrlRowDownNum = ctrlRowUpperNum * 3;
+
+        int[] ctrlColArray = getPixelsArrayFromCol(mat, ctrlColumnNum);
+        int[] ctrlRowUpArray = getPixelsArrayByRow(mat, ctrlRowUpperNum);
+        int[] ctrlRowDownArray = getPixelsArrayByRow(mat, ctrlRowDownNum);
+
+        try {
+            int assumedNumber = getNumberPatternByArrays(ctrlColArray, ctrlColumnNum,
+                    ctrlRowUpArray, ctrlRowUpperNum,
+                    ctrlRowDownArray, ctrlRowDownNum);
+
+            return getNumberByPattern(assumedNumber);
+        } catch (NotNumberException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * checking is assumed digit's patter is really digit
+     *
+     * @param assumedNumber pattern of assumed number to check is this digit
+     * @return recognized number of negative int if it is not number
+     */
+    private int getNumberByPattern(int assumedNumber) {
+
+        switch (assumedNumber) {
+            case 63:
+                return 0;
+
+            case 6:
+                return 1;
+
+            case 91:
+                return 2;
+
+            case 79:
+                return 3;
+
+            case 102:
+                return 4;
+
+            case 109:
+                return 5;
+
+            case 125:
+                return 6;
+
+            case 7:
+                return 7;
+
+            case 127:
+                return 8;
+
+            case 111:
+                return 9;
+
+            default:
+                return -1;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,11 +235,12 @@ public class MainActivity extends AppCompatActivity {
             Mat submat = cuttedImgMat.submat(rect);
             double[] temp = submat.get(0, 0);
             Log.d(TAG, "sizes: " + submat.cols() + " " + submat.rows());
-            if (submat.cols() <= 50 || submat.rows() <= 50 || submat.rows() >= 200) {
-                continue;
-            }
+//            if (submat.cols() <= 50 || submat.rows() <= 50 || submat.rows() >= 200) {
+//                continue;
+//            }
 
             int number = whatNumberIsThis(submat);
+            Log.d(TAG, "the number is " + number);
 
         }
         //---------------
@@ -149,81 +253,6 @@ public class MainActivity extends AppCompatActivity {
 
         ImageView imgView = findViewById(R.id.imageView);
         imgView.setImageBitmap(outputBitmap);
-    }
-
-    /**
-     * detecting what is number is in the matrix
-     * expect 7 segment digit in this matrix
-     *
-     * @param mat matrix to detect the number
-     * @return possible number [0 - 9] or negative value if it is not number in matrix
-     */
-    private int whatNumberIsThis(Mat mat) {
-        //creating 3 control lines:
-        // one is in the middle column to detect horizontal segments of number
-        // second is row to detect upper vertical segments
-        // third one is row to detect down vertical segments
-        int ctrlColumnNum = mat.cols() / 2;
-        int ctrlRowUpperNum = mat.rows() / 4;
-        int ctrlRowDownNum = ctrlRowUpperNum * 3;
-
-        int[] ctrlColArray = getPixelsArrayFromCol(mat, ctrlColumnNum);
-        int[] ctrlRowUpArray = getPixelsArrayByRow(mat, ctrlRowUpperNum);
-        int[] ctrlRowDownArray = getPixelsArrayByRow(mat, ctrlRowDownNum);
-
-        try {
-            int assumedNumber = getNumberPatternByArrays(ctrlColArray, ctrlColumnNum,
-                    ctrlRowUpArray, ctrlRowUpperNum,
-                    ctrlRowDownArray, ctrlRowDownNum);
-
-            return getNumberByPattern(assumedNumber);
-        } catch (NotNumberException e) {
-            return -1;
-        }
-    }
-
-    /**
-     * checking is assumed digit's patter is really digit
-     *
-     * @param assumedNumber pattern of assumed number to check is this digit
-     * @return recognized number of negative int if it is not number
-     */
-    private int getNumberByPattern(int assumedNumber) {
-
-        switch (assumedNumber) {
-            case 63:
-                return 0;
-
-            case 6:
-                return 1;
-
-            case 91:
-                return 2;
-
-            case 79:
-                return 3;
-
-            case 102:
-                return 4;
-
-            case 109:
-                return 5;
-
-            case 125:
-                return 6;
-
-            case 7:
-                return 7;
-
-            case 127:
-                return 8;
-
-            case 111:
-                return 9;
-
-            default:
-                return -1;
-        }
     }
 
     /**
@@ -241,47 +270,50 @@ public class MainActivity extends AppCompatActivity {
     private int getNumberPatternByArrays(int[] ctrlColArray, int ctrlColumnNum,
                                          int[] ctrlRowUpArray, int ctrlRowUpperNum,
                                          int[] ctrlRowDownArray, int ctrlRowDownNum) throws NotNumberException {
-        //number of pixels to cut from borders
-        int borderPix = 2;
+        try {
+            //number of pixels to cut from borders
+            int borderPix = 2;
 
-        //getting segment max width, presume that it could not be more then 30% of digit width
-        final int segmentMaxWidth = (int) (0.3 * ctrlRowUpArray.length);
+            //getting segment max width, presume that it could not be more then 30% of digit width
+            final int segmentMaxWidth = (int) (0.3 * ctrlRowUpArray.length);
 
-        //resulted pattern value
-        //int value where each bit represents segment of 7-segment number
-        int resultedPattern = 0;
+            //resulted pattern value
+            //int value where each bit represents segment of 7-segment number
+            int resultedPattern = 0;
 
-        //segment 0
-        int[] seg0Array = Arrays.copyOfRange(ctrlColArray, borderPix, ctrlRowUpperNum);
-        resultedPattern = isSegmentOn(seg0Array, 0, segmentMaxWidth) ? resultedPattern | 0b1 : resultedPattern;
+            //segment 0
+            int[] seg0Array = Arrays.copyOfRange(ctrlColArray, borderPix, ctrlRowUpperNum);
+            resultedPattern = isSegmentOn(seg0Array, 0, segmentMaxWidth) ? resultedPattern | 0b1 : resultedPattern;
 
-        //segment 1
-        int[] seg1Array = Arrays.copyOfRange(ctrlRowUpArray, ctrlColumnNum, ctrlRowUpArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg1Array, 1, segmentMaxWidth) ? resultedPattern | 0b10 : resultedPattern;
+            //segment 1
+            int[] seg1Array = Arrays.copyOfRange(ctrlRowUpArray, ctrlColumnNum, ctrlRowUpArray.length - borderPix);
+            resultedPattern = isSegmentOn(seg1Array, 1, segmentMaxWidth) ? resultedPattern | 0b10 : resultedPattern;
 
-        //segment 2
-        int[] seg2Array = Arrays.copyOfRange(ctrlRowDownArray, ctrlColumnNum, ctrlRowDownArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg2Array, 2, segmentMaxWidth) ? resultedPattern | 0b100 : resultedPattern;
+            //segment 2
+            int[] seg2Array = Arrays.copyOfRange(ctrlRowDownArray, ctrlColumnNum, ctrlRowDownArray.length - borderPix);
+            resultedPattern = isSegmentOn(seg2Array, 2, segmentMaxWidth) ? resultedPattern | 0b100 : resultedPattern;
 
-        //segment 3
-        int[] seg3Array = Arrays.copyOfRange(ctrlColArray, ctrlRowDownNum, ctrlColArray.length - borderPix);
-        resultedPattern = isSegmentOn(seg3Array, 3, segmentMaxWidth) ? resultedPattern | 0b1000 : resultedPattern;
+            //segment 3
+            int[] seg3Array = Arrays.copyOfRange(ctrlColArray, ctrlRowDownNum, ctrlColArray.length - borderPix);
+            resultedPattern = isSegmentOn(seg3Array, 3, segmentMaxWidth) ? resultedPattern | 0b1000 : resultedPattern;
 
-        //segment 4
-        int[] seg4Array = Arrays.copyOfRange(ctrlRowDownArray, borderPix, ctrlColumnNum);
-        resultedPattern = isSegmentOn(seg4Array, 4, segmentMaxWidth) ? resultedPattern | 0b10000 : resultedPattern;
+            //segment 4
+            int[] seg4Array = Arrays.copyOfRange(ctrlRowDownArray, borderPix, ctrlColumnNum);
+            resultedPattern = isSegmentOn(seg4Array, 4, segmentMaxWidth) ? resultedPattern | 0b10000 : resultedPattern;
 
-        //segment 5
-        int[] seg5Array = Arrays.copyOfRange(ctrlRowUpArray, borderPix, ctrlColumnNum);
-        resultedPattern = isSegmentOn(seg5Array, 5, segmentMaxWidth) ? resultedPattern | 0b100000 : resultedPattern;
+            //segment 5
+            int[] seg5Array = Arrays.copyOfRange(ctrlRowUpArray, borderPix, ctrlColumnNum);
+            resultedPattern = isSegmentOn(seg5Array, 5, segmentMaxWidth) ? resultedPattern | 0b100000 : resultedPattern;
 
-        //segment 6
-        int[] seg6Array = Arrays.copyOfRange(ctrlColArray, ctrlRowUpperNum + 1, ctrlRowDownNum);
-        resultedPattern = isSegmentOn(seg6Array, 6, segmentMaxWidth) ? resultedPattern | 0b1000000 : resultedPattern;
+            //segment 6
+            int[] seg6Array = Arrays.copyOfRange(ctrlColArray, ctrlRowUpperNum + 1, ctrlRowDownNum);
+            resultedPattern = isSegmentOn(seg6Array, 6, segmentMaxWidth) ? resultedPattern | 0b1000000 : resultedPattern;
 
-        return resultedPattern;
+            return resultedPattern;
+        } catch (IllegalArgumentException ex) {
+            throw new NotNumberException(NOT_DIGIT_MESSAGE);
+        }
     }
-
 
     /**
      * check is the segment is ON
@@ -295,7 +327,11 @@ public class MainActivity extends AppCompatActivity {
      */
     private boolean isSegmentOn(int[] segArray, int segmentIndex, final int segmentMaxWidth)
             throws IllegalArgumentException, NotNumberException {
-        final String NOT_DIGIT_MESSAGE = "this segment seems like not segment of digit";
+
+        //checking if segArray is too short to be a part of
+        if (segArray.length <= 3) {
+            throw new NotNumberException(NOT_DIGIT_MESSAGE);
+        }
 
         //init is start pixel is ON
         boolean startPixIsOn = segArray[0] >= 128;
@@ -398,7 +434,8 @@ public class MainActivity extends AppCompatActivity {
      * @return number of changes or negative integer in case it has more colors changes then maximum
      * or in case of width of segment is more then maxLength
      */
-    private int getNumberOfColorChangesWithCheck(int[] segArray, int maxNumberOfChanges, int maxLength) {
+    private int getNumberOfColorChangesWithCheck(int[] segArray, int maxNumberOfChanges,
+                                                 int maxLength) {
         //remember start element
         int previousPixel = segArray[0];
 
@@ -435,7 +472,6 @@ public class MainActivity extends AppCompatActivity {
         return changeCounter;
     }
 
-
     /**
      * getting pixels array from specified column
      *
@@ -469,7 +505,6 @@ public class MainActivity extends AppCompatActivity {
 
         return array;
     }
-
 
     private void drawRectAroundContours(ArrayList<MatOfPoint> contours, Mat imageMap) {
         MatOfPoint2f approxCurve = new MatOfPoint2f();
@@ -519,7 +554,6 @@ public class MainActivity extends AppCompatActivity {
         return mat;
     }
 
-
     /**
      * sorting contours left to right
      *
@@ -558,35 +592,7 @@ public class MainActivity extends AppCompatActivity {
         return new ArrayList<>(Arrays.asList(contoursArray));
     }
 
-
     public void someMethods() {
 //        double k = (Imgproc.contourArea(shape) / Imgproc.arcLength(shape, true) * Imgproc.arcLength(shape, true));
-    }
-
-    public static Bitmap getBitmapFromAsset(Context context) {
-        return getBitmapFromAsset(context, "example.jpg");
-//        return getBitmapFromAsset(context, "example2.png");
-//        return getBitmapFromAsset(context, "dev1.jpg");
-//        return getBitmapFromAsset(context, "dev1_cut.png");
-//        return getBitmapFromAsset(context, "dev2.jpg");
-//        return getBitmapFromAsset(context, "dev3.jpg");
-//        return getBitmapFromAsset(context, "dev4.jpg");
-//        return getBitmapFromAsset(context, "dev4_cut.png");
-    }
-
-    public static Bitmap getBitmapFromAsset(Context context, String filePath) {
-        AssetManager assetManager = context.getAssets();
-
-        InputStream istr;
-        Bitmap bitmap = null;
-        try {
-            istr = assetManager.open(filePath);
-            bitmap = BitmapFactory.decodeStream(istr);
-        } catch (IOException e) {
-            Log.d(TAG, "bitmap error: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return bitmap;
     }
 }

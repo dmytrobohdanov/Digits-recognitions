@@ -1,6 +1,7 @@
 package com.dbohdanov.opencvbytutorialcppfree.utils;
 
 import android.graphics.Bitmap;
+import android.util.Log;
 
 import com.dbohdanov.opencvbytutorialcppfree.ImgprocUtils;
 import com.dbohdanov.opencvbytutorialcppfree.NotNumberException;
@@ -185,6 +186,7 @@ public class TextRecognitionUtils {
         //creating destination matrix
         MatOfPoint2f resultedMat = new MatOfPoint2f(resultedArray);
 
+
         //getting PerspectiveTransform matrix
         Mat perspectiveTransform = Imgproc.getPerspectiveTransform(foundedShape, resultedMat);
 
@@ -219,9 +221,9 @@ public class TextRecognitionUtils {
 
             //get submatrix bounded this contour
             Mat submat = cuttedImgMat.submat(rect);
-            if (submat.cols() <= 50 || submat.rows() <= 50 || submat.rows() >= 200) {
-                continue;
-            }
+//            if (submat.cols() <= 50 || submat.rows() <= 50 || submat.rows() >= 200) {
+//                continue;
+//            }
 
             int number = whatNumberIsThis(submat);
 
@@ -240,7 +242,7 @@ public class TextRecognitionUtils {
      * @param mat matrix to detect the number
      * @return possible number [0 - 9] or negative value if it is not number in matrix
      */
-    private static int whatNumberIsThis(Mat mat) {
+    public static int whatNumberIsThis(Mat mat) {
         //creating 3 control lines:
         // one is in the middle column to detect horizontal segments of number
         // second is row to detect upper vertical segments
@@ -257,7 +259,6 @@ public class TextRecognitionUtils {
             int assumedNumber = getNumberPatternByArrays(ctrlColArray, ctrlColumnNum,
                     ctrlRowUpArray, ctrlRowUpperNum,
                     ctrlRowDownArray, ctrlRowDownNum);
-
             return getNumberByPattern(assumedNumber);
         } catch (NotNumberException e) {
             return -1;
@@ -358,6 +359,7 @@ public class TextRecognitionUtils {
      */
     private static boolean isSegmentOn(int[] segArray, int segmentIndex, final int segmentMaxWidth)
             throws IllegalArgumentException, NotNumberException {
+        Log.d("taag", "array" + segmentIndex + ": " + Arrays.toString(segArray));
 
         //checking if segArray is too short to be a part of
         if (segArray.length <= 3) {
